@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plastic Waste Hotspots</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <style>
+        #map { height: 90vh; width: 100%; }
+    </style>
+</head>
+<body>
+    <h1>Plastic Waste in Map</h1>
+    <div id="map"></div>
+
+    <!-- Leaflet main -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Heatmap plugin -->
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
+
+    <script>
+        var map = L.map('map').setView([20.5937, 78.9629], 5);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19
+        }).addTo(map);
+
+        // Data from Flask
+        var detections = {{ data | tojson | safe }};
+
+        // Plastic category heatmap datasets
+        var heatBottles = [];
+        var heatBags = [];
+        var heatWrappers = [];
+        var heatCups = [];
+        var heatOthers = [];
+
+        // Marker layer for plastic types
+        var markerLayer = L.layerGroup();
+
+        function getColor(detection) {
+            if (detection.toLowerCase().includes("bottle")) return "blue";
+            if (detection.toLowerCase().includes("bag")) return "green";
+            if (detection.toLowerCase().includes("wrapper")) return "red";
+            if (detection.toLowerCase().includes("cup")) return "purple";
+            return "orange";
+        }
+
+        detections.forEach(function(item) {
+            if (item.location && item.location.includes(",")) {
+                var coords = item.location.split(",");
+                var lat = parseFloat(coords[0].trim());
+                var lon = parseFloat(coords[1].trim());
+
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    var detLower = item.detections.toLowerCase();
+                    if (detLower.includes("bottle")) heatBottles.push([lat, lon, 1]);
+                    else if (detLower.includes("bag")) heatBags.push([lat, lon, 1]);
+                    else if (detLower.includes("wrapper")) heatWrappers.push([lat, lon, 1]);
+                    else if (detLower.includes("cup")) heatCups.push([lat, lon, 1]);
+                    else heatOthers.push([lat, lon, 1]);
+
+                    // Marker for each point
+                    var color = getColor(item.detections);
+                    L.circleMarker([lat, lon], {
+                        color: color,
+                        radius: 8,
+                        fillOpacity: 0.8
+                    }).bindPopup(
+                        `<b>Detections:</b> ${item.detections}<br>` +
+                        `<b>Date:</b> ${item.upload_date}<br>` +
+                        `<b>Time:</b> ${item.upload_time}`
+                    ).addTo(markerLayer);
+                }
+            }
+        });
+
+        // Create separate heatmaps for each plastic type
+        function createHeatLayer(data, gradient) {
+            return L.heatLayer(data, {
+                radius: 25,
+                blur: 15,
+                maxZoom: 17,
+                gradient: gradient
+            });
+        }
+
+        var heatmapBottles = createHeatLayer(heatBottles, {0.4: 'blue', 1: 'cyan'});
+        var heatmapBags = createHeatLayer(heatBags, {0.4: 'green', 1: 'lime'});
+        var heatmapWrappers = createHeatLayer(heatWrappers, {0.4: 'red', 1: 'orange'});
+        var heatmapCups = createHeatLayer(heatCups, {0.4: 'purple', 1: 'magenta'});
+        var heatmapOthers = createHeatLayer(heatOthers, {0.4: 'orange', 1: 'yellow'});
+
+        // Add markers initially
+        markerLayer.addTo(map);
+
+        // Layer control
+        var overlayMaps = {
+            "Plastic Type Markers": markerLayer,
+            "Heatmap - Bottles": heatmapBottles,
+            "Heatmap - Bags": heatmapBags,
+            "Heatmap - Wrappers": heatmapWrappers,
+            "Heatmap - Cups": heatmapCups,
+            "Heatmap - Others": heatmapOthers
+        };
+
+        L.control.layers({}, overlayMaps, {collapsed: false}).addTo(map);
+    </script>
+</body>
+</html>

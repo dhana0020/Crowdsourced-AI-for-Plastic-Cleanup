@@ -9,3 +9,5 @@ pillow
 requests
 tqdm
 leaflet
+gdown
+

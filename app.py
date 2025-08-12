@@ -1,39 +1,39 @@
 from flask import Flask, render_template, request, redirect
-import os
-import csv
-import cv2
+from ultralytics import YOLO
+import cv2, os, csv
 from datetime import datetime
 import pandas as pd
-import requests
-from ultralytics import YOLO
+import gdown  # <-- Added for Google Drive download
 
-app = Flask(__name__)
-
-# === Download model from Google Drive ===
+# ------------------ CONFIG ------------------
 MODEL_DIR = "model"
 MODEL_PATH = os.path.join(MODEL_DIR, "best.pt")
-MODEL_URL = "https://drive.google.com/uc?export=download&id=1lLcJbJa86pl-cV8PrETPoa19bd-fXOQw"
+GOOGLE_DRIVE_ID = "1lLcJbJa86pl-cV8PrETPoa19bd-fXOQw"  # Your Google Drive file ID
 
+UPLOAD_FOLDER = "static/uploads"
+CSV_FILE = "uploads.csv"
+
+# Create necessary folders
 os.makedirs(MODEL_DIR, exist_ok=True)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# ------------------ DOWNLOAD MODEL IF MISSING ------------------
 if not os.path.exists(MODEL_PATH):
     print("Downloading YOLO model from Google Drive...")
-    r = requests.get(MODEL_URL, allow_redirects=True)
-    with open(MODEL_PATH, "wb") as f:
-        f.write(r.content)
-    print("Model download complete.")
+    gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
 
 # Load YOLO model
 model = YOLO(MODEL_PATH)
 
-UPLOAD_FOLDER = "static/uploads"
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-
-CSV_FILE = "uploads.csv"
+# ------------------ INIT CSV ------------------
 if not os.path.exists(CSV_FILE):
     with open(CSV_FILE, mode='w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["filename_original", "filename_result", "detections", "upload_date", "upload_time", "location"])
+        writer.writerow(["filename_original", "filename_result", "detections",
+                         "upload_date", "upload_time", "location"])
+
+# ------------------ FLASK APP ------------------
+app = Flask(__name__)
 
 @app.route("/")
 def index():
@@ -85,7 +85,8 @@ def upload():
         # Save to CSV
         with open(CSV_FILE, mode='a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([filename, result_filename, ", ".join(detections), date_str, time_str, location_str])
+            writer.writerow([filename, result_filename, ", ".join(detections),
+                             date_str, time_str, location_str])
 
         return render_template("index.html",
                                result_image=result_filename,

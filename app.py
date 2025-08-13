@@ -4,27 +4,23 @@ import csv
 import cv2
 from datetime import datetime
 import pandas as pd
-import gdown
 from ultralytics import YOLO
 
+# ---------------- Flask setup ----------------
 app = Flask(__name__)
 
-# === Download model from Google Drive safely ===
+# ---------------- Model setup ----------------
 MODEL_DIR = "model"
 MODEL_PATH = os.path.join(MODEL_DIR, "best.pt")
-DRIVE_FILE_ID = "1lLcJbJa86pl-cV8PrETPoa19bd-fXOQw"  # from your share link
-GDOWN_URL = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
 
-os.makedirs(MODEL_DIR, exist_ok=True)
-
+# Ensure model exists
 if not os.path.exists(MODEL_PATH):
-    print("Downloading YOLO model from Google Drive...")
-    gdown.download(GDOWN_URL, MODEL_PATH, quiet=False, fuzzy=True)
-    print("Model download complete.")
+    raise FileNotFoundError(f"Model file not found at {MODEL_PATH}. Please place best.pt in the model/ folder.")
 
 # Load YOLO model
 model = YOLO(MODEL_PATH)
 
+# ---------------- Upload setup ----------------
 UPLOAD_FOLDER = "static/uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -34,9 +30,11 @@ if not os.path.exists(CSV_FILE):
         writer = csv.writer(f)
         writer.writerow(["filename_original", "filename_result", "detections", "upload_date", "upload_time", "location"])
 
+# ---------------- Routes ----------------
 @app.route("/")
 def index():
     return render_template("index.html")
+
 
 @app.route("/upload", methods=["POST"])
 def upload():
@@ -93,6 +91,7 @@ def upload():
                                time=time_str,
                                location=location_str)
 
+
 @app.route("/map")
 def map_page():
     if os.path.exists(CSV_FILE):
@@ -108,6 +107,7 @@ def map_page():
         data = []
     return render_template("map.html", data=data)
 
+
+# ---------------- Main ----------------
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(debug=True)

@@ -1,39 +1,38 @@
 from flask import Flask, render_template, request, redirect
-from ultralytics import YOLO
-import cv2, os, csv
+import os
+import csv
+import cv2
 from datetime import datetime
 import pandas as pd
-import gdown  # <-- Added for Google Drive download
+import gdown
+from ultralytics import YOLO
 
-# ------------------ CONFIG ------------------
+app = Flask(__name__)
+
+# === Download model from Google Drive safely ===
 MODEL_DIR = "model"
 MODEL_PATH = os.path.join(MODEL_DIR, "best.pt")
-GOOGLE_DRIVE_ID = "1lLcJbJa86pl-cV8PrETPoa19bd-fXOQw"  # Your Google Drive file ID
+DRIVE_FILE_ID = "1lLcJbJa86pl-cV8PrETPoa19bd-fXOQw"  # from your share link
+GDOWN_URL = f"https://drive.google.com/uc?id={DRIVE_FILE_ID}"
 
-UPLOAD_FOLDER = "static/uploads"
-CSV_FILE = "uploads.csv"
-
-# Create necessary folders
 os.makedirs(MODEL_DIR, exist_ok=True)
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# ------------------ DOWNLOAD MODEL IF MISSING ------------------
 if not os.path.exists(MODEL_PATH):
     print("Downloading YOLO model from Google Drive...")
-    gdown.download(f"https://drive.google.com/uc?id={GOOGLE_DRIVE_ID}", MODEL_PATH, quiet=False)
+    gdown.download(GDOWN_URL, MODEL_PATH, quiet=False, fuzzy=True)
+    print("Model download complete.")
 
 # Load YOLO model
 model = YOLO(MODEL_PATH)
 
-# ------------------ INIT CSV ------------------
+UPLOAD_FOLDER = "static/uploads"
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+CSV_FILE = "uploads.csv"
 if not os.path.exists(CSV_FILE):
     with open(CSV_FILE, mode='w', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow(["filename_original", "filename_result", "detections",
-                         "upload_date", "upload_time", "location"])
-
-# ------------------ FLASK APP ------------------
-app = Flask(__name__)
+        writer.writerow(["filename_original", "filename_result", "detections", "upload_date", "upload_time", "location"])
 
 @app.route("/")
 def index():
@@ -85,8 +84,7 @@ def upload():
         # Save to CSV
         with open(CSV_FILE, mode='a', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow([filename, result_filename, ", ".join(detections),
-                             date_str, time_str, location_str])
+            writer.writerow([filename, result_filename, ", ".join(detections), date_str, time_str, location_str])
 
         return render_template("index.html",
                                result_image=result_filename,
@@ -111,4 +109,5 @@ def map_page():
     return render_template("map.html", data=data)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
